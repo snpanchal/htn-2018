@@ -9,7 +9,6 @@ object-detection-htn2018
   * Images (temporary)
     * Image
       * Location
-      * Classification
       * Image link in storage (URL)
   * Categories
     * Classification
