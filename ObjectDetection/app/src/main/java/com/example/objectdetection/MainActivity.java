@@ -38,7 +38,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements LocationListener {
+public class MainActivity extends AppCompatActivity {
 
     public static final int REQUEST_IMAGE_CAPTURE = 100;
     public static final int CAMERA_PERMISSION_REQUEST_CODE = 1000;
@@ -48,6 +48,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     private ImageView imageView;
     private Bitmap image;
     private LocationManager locationManager;
+    private double longitude;
+    private double latitude;
 
     private DatabaseReference mainRef;
     private StorageReference storage;
@@ -65,17 +67,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         launchCameraButton = findViewById(R.id.launch_camera_button);
         imageView = findViewById(R.id.imageView);
 
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            Location location = locationManager.getLastKnownLocation(locationManager.NETWORK_PROVIDER);
-            onLocationChanged(location);
-        }
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            String[] permissionRequest = { Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE };
-            requestPermissions(permissionRequest, LOCATION_PERMISSION_REQUEST_CODE);
-        }
-
         launchCameraButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -83,9 +74,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
                             checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
                         launchCamera();
-                    }
-                    else {
-                        String[] permissionRequest = { Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE };
+                    } else {
+                        String[] permissionRequest = {Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE};
                         requestPermissions(permissionRequest, CAMERA_PERMISSION_REQUEST_CODE);
                     }
                 }
@@ -94,9 +84,9 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     }
 
     public void launchCamera() {
-        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(cameraIntent, REQUEST_IMAGE_CAPTURE);
         }
     }
 
@@ -124,28 +114,16 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     imageRef.getDownloadUrl().addOnCompleteListener(new OnCompleteListener<Uri>() {
                         @Override
                         public void onComplete(@NonNull Task<Uri> task) {
+                            Log.i("Location", "onComplete: 2");
                             if (task.isSuccessful()) {
                                 String downloadUrl = task.getResult().toString();
 
-                                LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-                                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-                                        ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                    Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                                    double longitude = location.getLongitude();
-                                    double latitude = location.getLatitude();
-                                    Log.i("Location", "Latitude: " + latitude + ", Longitude: " + longitude);
-
-                                    String imageKey = mainRef.child("tempimgs").push().getKey();
-                                    Map imageDetails = new HashMap();
-                                    imageDetails.put("location/latitude", latitude);
-                                    imageDetails.put("location/longitude", longitude);
-                                    imageDetails.put("downloadUrl", downloadUrl);
-                                    mainRef.child("tempimgs").child(imageKey).updateChildren(imageDetails);
-                                }
-                                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    String[] permissionRequest = { Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE };
-                                    requestPermissions(permissionRequest, LOCATION_PERMISSION_REQUEST_CODE);
-                                }
+                                String imageKey = mainRef.child("tempimgs").push().getKey();
+                                Map imageDetails = new HashMap();
+                                imageDetails.put("location/latitude", latitude);
+                                imageDetails.put("location/longitude", longitude);
+                                imageDetails.put("downloadUrl", downloadUrl);
+                                mainRef.child("tempimgs").child(imageKey).updateChildren(imageDetails);
                             }
                         }
                     });
@@ -162,19 +140,10 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                 boolean cameraPermissionsGranted = checkPermissions(grantResults);
                 if (cameraPermissionsGranted) {
                     launchCamera();
-                }
-                else {
+                } else {
                     Toast.makeText(this, "Can't use camera without permission.", Toast.LENGTH_SHORT).show();
                 }
-            case LOCATION_PERMISSION_REQUEST_CODE:
-                boolean locationPermissionsGranted = checkPermissions(grantResults);
-                if (locationPermissionsGranted) {
-                    Location location = locationManager.getLastKnownLocation(locationManager.NETWORK_PROVIDER);
-                    onLocationChanged(location);
-                }
-                else {
-                    Toast.makeText(this, "Can't use camera without permission.", Toast.LENGTH_SHORT).show();
-                }
+                break;
         }
     }
 
@@ -195,26 +164,5 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CANADA);
         String timestamp = sdf.format(new Date());
         return "IMG_" + timestamp + ".png";
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        double longitude = location.getLongitude();
-        double latitude = location.getLatitude();
-    }
-
-    @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
     }
 }
