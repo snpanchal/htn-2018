@@ -10,15 +10,32 @@
 const functions = require('firebase-functions');
 var VisualRecognitionV3 = require('watson-developer-cloud/visual-recognition/v3');
 
+var visualRecognition = new VisualRecognitionV3({
+    version: '2018-03-19',
+    iam_apikey: 'QP0NFRm2O9c8SYu10OQYU4yK2voAFIbQEuQR1MI4oAao'
+});
+
+
+
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 const admin = require('firebase-admin');
-const gcs = require('@google-cloud/storage')();
-const spawn = require('child-process-promise').spawn;
+
+
+admin.initializeApp();
+
+const mkdirp = require('mkdirp-promise');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-admin.initializeApp();
+
+// var config = {
+//     projectId: 'object-detection-htn2018',
+//     keyFilename: '/path/to/keyfile.json'
+//   };
+// const gcs = require('@google-cloud/storage')(config);
+// gcs(config);
+// const spawn = require('child-process-promise').spawn;
 // var db = admin.database();
 
 exports.addMessage = functions.https.onRequest((req, res) => {
@@ -64,38 +81,95 @@ exports.addTempImg = functions.https.onRequest((req, res) => {
     });
 });
 
-exports.generateThumbnail = functions.storage.object().onFinalize(object => {
+exports.processNewImage = functions.storage.object("/images").onFinalize(object => {
     // The Storage object.
     const fileBucket = object.bucket; // The Storage bucket that contains the file.
     const filePath = object.name; // File path in the bucket.
     const contentType = object.contentType; // File content type.
     const metageneration = object.metageneration; // Number of times metadata has been generated. New objects have a value of 1.
-    console.log(object.name);
+    console.log("nom: " + object.name);
+
+
 
     // Exit if this is triggered on a file that is not an image.
     if (!contentType.startsWith('image/')) {
         console.log('This is not an image.');
         return null;
     }
-
-    // Get the file name.
+    const fileDir = path.dirname(filePath);
     const fileName = path.basename(filePath);
+    // const thumbFilePath = path.normalize(path.join(fileDir, `${THUMB_PREFIX}${fileName}`));
+    const tempLocalFile = path.join(os.tmpdir(), fileName);
+    // const tempLocalFile = path.join("/Users/v7770/Downloads", filePath)
+    const tempLocalDir = path.dirname(tempLocalFile);
+    console.log("dir", tempLocalDir, "file", tempLocalFile)
 
-    const bucket = gcs.bucket(fileBucket);
-    const tempFilePath = path.join(os.tmpdir(), fileName);
+    // const tempLocalThumbFile = path.join(os.tmpdir(), thumbFilePath);
+    const bucket = admin.storage().bucket(object.bucket);
+    const file = bucket.file(filePath);
+    // const thumbFile = bucket.file(thumbFilePath);
     const metadata = {
         contentType: contentType,
+        // To enable Client-side caching you can set the Cache-Control headers here. Uncomment below.
+        // 'Cache-Control': 'public,max-age=3600',
     };
-    return bucket.file(filePath).download({
-        destination: tempFilePath,
-    }).then(() => {
-        console.log('Image downloaded locally to', tempFilePath);
-        // Generate a thumbnail using ImageMagick.
-        // return spawn('convert', [tempFilePath, '-thumbnail', '200x200>', tempFilePath]);
-        return fs.unlinkSync(tempFilePath)
-    }).then(()=>{
-        return null;
-    })
+    // return mkdirp(tempLocalDir)
+
+        // Create the temp directory where the storage file will be downloaded.
+        // mkdirp(tempLocalDir).then(()=>{
+
+        // });
+        // Download file from bucket.
+        // await 
+
+        // Get the file name.
+        // const fileName = path.basename(filePath);
+
+        // const bucket = gcs.bucket(fileBucket);
+        // const tempFilePath = path.join(os.tmpdir(), fileName);
+        // const metadata = {
+        //     contentType: contentType,
+        // };
+        // return bucket.file(filePath).download({
+        //     destination: tempFilePath,
+        // }).then(() => {
+        //     console.log('Image downloaded locally to', tempFilePath);
+        //     // Generate a thumbnail using ImageMagick.
+        //     // return spawn('convert', [tempFilePath, '-thumbnail', '200x200>', tempFilePath]);
+        //     return fs.unlinkSync(tempFilePath)
+        // }).then(()=>{
+        //     return null;
+        // .then(() => {
+            return file.download({ destination: tempLocalFile })
+        // })
+        .then(() => {
+            console.log('The file has been downloaded to', tempLocalFile);
+            console.log("dir",tempLocalDir )
+            var images_file = fs.createReadStream(tempLocalFile);
+
+            var params = {
+                images_file: images_file
+            };
+
+            visualRecognition.detectFaces(params,  function(err, response) {
+                if (err)
+                  console.log(err);
+                else
+                  console.log(JSON.stringify(response, null, 2))
+                fs.unlinkSync(tempLocalFile);
+                // fs.unlinkSync(tempLocalThumbFile);
+                // console.log(res)
+                return console.log("odone");
+              })
+        })
+        // .then(() => {
+
+        //     fs.unlinkSync(tempLocalFile);
+        //     // fs.unlinkSync(tempLocalThumbFile);
+        //     // console.log(res)
+        //     return console.log("odone");
+        // })
+});
     // .then(() => {
     //     console.log('Thumbnail created at', tempFilePath);
     //     // We add a 'thumb_' prefix to thumbnails file name. That's where we'll upload the thumbnail.
@@ -110,9 +184,9 @@ exports.generateThumbnail = functions.storage.object().onFinalize(object => {
     //     // Once the thumbnail has been uploaded delete the local file to free up disk space.
     // })
     // .then(() => fs.unlinkSync(tempFilePath));
-    
+
     // return null;
-});
+// });
 
 // exports.addImageTag = functions.https.onRequest((req,res)=>{
 //     let rf = db.ref("/tempimgs");
