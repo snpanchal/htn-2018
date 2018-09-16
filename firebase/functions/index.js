@@ -12,7 +12,8 @@ var VisualRecognitionV3 = require('watson-developer-cloud/visual-recognition/v3'
 
 var visualRecognition = new VisualRecognitionV3({
     version: '2018-03-19',
-    iam_apikey: 'QP0NFRm2O9c8SYu10OQYU4yK2voAFIbQEuQR1MI4oAao'
+    iam_apikey: 'lmmpMXASBHikLyFcX1ItBLkynIyQT8MenumM6HXO7W8Y'
+    // 'QP0NFRm2O9c8SYu10OQYU4yK2voAFIbQEuQR1MI4oAao'
 });
 
 
@@ -148,10 +149,11 @@ exports.processNewImage = functions.storage.object("/images").onFinalize(object 
             var images_file = fs.createReadStream(tempLocalFile);
 
             var params = {
-                images_file: images_file
+                images_file: images_file,
+                classifier_ids:["food"]
             };
 
-            visualRecognition.detectFaces(params,  function(err, response) {
+            visualRecognition.classify(params,  function(err, response) {
                 if (err)
                   console.log(err);
                 else
